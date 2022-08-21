@@ -1,0 +1,76 @@
+// Import variables
+@import "variables";
+
+.wrapper {
+	display: grid;
+	grid:
+		[row-topbar-start] "sidebar topbar topbar" $topbar-height [row-topbar-end]
+		[row-header-start] "sidebar main-btns main-btns" $topbar-height [row-header-end]
+		[row-top-start] "sidebar task editor" 45% [row-top-end]
+		[row-bottom-start] "sidebar task result" 1fr [row-bottom-end]
+		/ $sidebar-width 1fr 1fr;
+	place-content: stretch;
+}
+
+.sidebar {
+	grid-area: sidebar;
+}
+
+@import "components/sidebar";
+
+.topbar {
+	grid-area: topbar;
+}
+
+@import "components/navbar";
+
+.task {
+	grid-area: task;
+	place-content: stretch;
+	border-right: $border-width solid $vertical-sep-border-color;
+	// TODO: extend for more styling
+}
+
+.editor {
+	grid-area: editor;
+	place-content: stretch;
+
+	&.main-btns {
+		grid-area: main-btns;
+		place-content: stretch;
+		min-width: 600px;
+
+		&> header {
+			position: relative;
+			height: $topbar-height;
+			width: 100%;
+			z-index: 2;
+		}
+	}
+
+	.CodeMirror {
+		height: auto;
+		.CodeMirror-code {
+			.cm-comment, .cm-meta {color:#94b3d7}
+			.cm-keyword, .cm-property {color:#5784cf}
+			.cm-atom, .cm-number {color:#b64a4a}
+			.cm-node, .cm-tag {color:#9c3328}
+			.cm-string {color:#b64a4a}
+			.cm-variable, .cm-qualifier {color:#3f4146}
+		}
+	}
+}
+
+.results {
+	grid-area: result;
+	place-content: stretch;
+	padding-bottom: $topbar-height +3px;
+
+	&> header {
+		position: relative;
+    }
+}
+
+@import "components/editor";
+@import "components/results";
+

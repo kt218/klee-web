@@ -24,6 +24,11 @@ def index(request):
     return render(request, 'frontend/index.html', {'form': form})
 
 
+def game(request):
+    form = SubmitJobForm()
+    return render(request, 'frontend/game.html', {'form': form})
+
+
 def store_data(task, type, data):
     d = {'type': type, 'data': data}
     task.current_output = json.dumps(d)

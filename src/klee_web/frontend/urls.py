@@ -5,6 +5,7 @@ from . import views
 
 urlpatterns = [
     url(r'^$', views.index, name='index'),
+    url(r'^game/$', views.game, name='game'),
 
     # Web hooks
     url(r'^jobs/notify/$', views.jobs_notify, name='jobs_notify'),
