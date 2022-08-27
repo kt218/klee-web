@@ -8,6 +8,7 @@
 <link href="{{ dist }}css/vendor/codemirror/theme/neo.css" rel="stylesheet">
 <link href="{{ dist }}css/vendor/jquery-ui.min.css" rel="stylesheet">
 <link href="{{ dist }}css/game.css" rel="stylesheet">
+<link href="{{ dist }}css/vendor/highlightjs/styles/github.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -19,7 +20,7 @@
             <div class="project-selector">
                 <select
                         ng-model="$parent.selectedProject"
-                        ng-options="project.name for project in projects 
+                        ng-options="project.name for project in projects
                         {% if not user.is_authenticated %}
                           | filter: {auth:'!false'}
                         {% endif %}"
@@ -38,10 +39,10 @@
 
         <div class="current-file">
             <header>
-                <h3>Current file</h3>
+                <h3>Current challenge</h3>
             </header>
-            <p ng-cloak><i class="icon_document_alt"></i> [[ submission.name ||
-                'No file selected' ]]</p>
+            <p ng-cloak><i class="icon_document_alt"></i> [[ challenge.name ||
+                'No challenge selected' ]]</p>
         </div>
 
         <div class="available-files">
@@ -61,11 +62,12 @@
             </div>
 
             <ul class="files" ng-hide="projectToAdd">
-                <li ng-repeat="file in files" ng-cloak>
-                    <a href="#" ng-click="selectFile(file)">
+                <li ng-repeat="challenge in challenges" ng-cloak>
+                    <a href="#" ng-click="selectChallenge(challenge)">
                         <i class="icon_document_alt"></i> [[
-                        file.name|truncate:15 ]]
+                        challenge.name|truncate:15 ]]
                     </a>
+{#                    TODO: deleteChallenge i.e. reset userSubmission #}
                     <a href="#" class="delete-file" ng-click="deleteFile(file)"
                        ng-if="!selectedProject.example">
                         <i class="icon_close"></i>
@@ -87,7 +89,9 @@
     <!-- Topbar / Navbar -->
     <nav class="topbar">
         <header>
-            <img src="{{ dist }}img/klee-logo.svg" class="logo" title="KLEE"/>
+            <a href="/">
+                <img src="{{ dist }}img/klee-logo.svg" class="logo" title="KLEE"/>
+            </a>
             {% if not user.is_authenticated %}
             <div class="register-area">
                 <a href="user/register">Register</a>
@@ -109,8 +113,19 @@
         </header>
     </nav>
 
-    <!-- Main container -->
+    <!-- Left container -->
+    <div class="task" ng-controller="TaskMarkedCtrl">
+        <div id="mdHtml" ng-bind-html="mdHtml"
+             ng-show="$parent.tabs.task.active"></div>
+        <div ng-show="$parent.tabs.solution.active">
+            <div ui-codemirror id="codemirrorSolution"
+                 ng-model="$parent.challenge.solutionCode.code"
+                 ui-refresh="$parent.tabs.solution.active"
+                 ui-codemirror-opts="editorOptions"></div>
+        </div>
+    </div>
 
+    <!-- Main container -->
     <form ng-submit="processForm(submission)"
           enctype="multipart/form-data"
           class="{% if messages %} has-error {% endif %}"
@@ -121,186 +136,18 @@
 
         <div class="editor main-btns">
             <header>
-                <div class="options-btn btn-group" dropdown>
-                    <button type="button" class="btn k-btn" ng-click="toggleSymArgs($event)" dropdown-toggle>
-                        Sym. Args
-                        <i ng-class="{'icon_box-empty': !opts.symArgs, 'icon_box-checked': opts.symArgs}"></i>
-                    </button>
-                    <button type="button" class="btn k-btn dropdown-toggle"
-                            dropdown-toggle>
-                        <i class="arrow_triangle-down"></i>
-                        <span class="sr-only"></span>
-                    </button>
-                    <div class="dropdown-menu" role="menu"
-                         ng-click="$event.stopPropagation()">
-                        <header>
-                            <h4>Symbolic Arguments</h4>
-
-                            <p>
-                                <small>Specify the number and size of the
-                                  program arguments to be made symbolic.
-                                </small>
-                            </p>
-                        </header>
-
-                        <div class="form-group">
-                            <label>No. of symbolic arguments</label>
-                            <div class="args-slider">
-                                <div class="slider-inner">
-                                    <div ui-slider="{range: true}" min="0"
-                                         max="9" step="1"
-                                         ng-model="config.symArgs.range"></div>
-                                </div>
-                                <div class="units">
-                                    <span class="min">0<br/>Min</span>
-                                    [[ config.symArgs.range[0] ]] to
-                                    [[ config.symArgs.range[1] ]]
-                                    <span class="max">9<br/>Max</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Argument(s) size (bytes)</label>
-                            <input type="text"
-                                   ng-model="config.symArgs.size"
-                                   class="form-control"/>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="options-btn btn-group" dropdown>
-                    <button type="button" class="btn k-btn" ng-click="toggleSymFiles($event)" dropdown-toggle>
-                        Sym. Files
-                        <i ng-class="{'icon_box-empty': !opts.symFiles, 'icon_box-checked': opts.symFiles}"></i>
-                    </button>
-                    <button type="button" class="btn k-btn dropdown-toggle"
-                            dropdown-toggle>
-                        <i class="arrow_triangle-down"></i>
-                        <span class="sr-only"></span>
-                    </button>
-                    <div class="dropdown-menu" role="menu"
-                         ng-click="$event.stopPropagation()">
-                        <header>
-                            <h4>Symbolic Files</h4>
-
-                            <p>
-                                <small>File reads are taken from n files,
-                                    whose contents of which will vary
-                                    amongst separate executions.
-                                </small>
-                            </p>
-                        </header>
-
-                        <div class="form-group">
-                            <label>No. of symbolic files</label>
-
-                            <div class="args-slider">
-                                <div class="slider-inner">
-                                    <div ui-slider="{range: false}" min="0"
-                                         max="9" step="1"
-                                         ng-model="config.symFiles.num"></div>
-                                </div>
-                                <div class="units">
-                                    <span class="min">0<br/>Min</span>
-                                    [[ config.symFiles.num ]]
-                                    <span class="max">9<br/>Max</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>File(s) size (bytes)</label>
-                            <input type="text"
-                                   ng-model="config.symFiles.size"
-                                   class="form-control"/>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="options-btn btn-group" dropdown>
-                    <button type="button" class="btn k-btn" ng-click="toggleSymIn($event)" dropdown-toggle>
-                        Sym. Input
-                        <i ng-class="{'icon_box-empty': !opts.symIn, 'icon_box-checked': opts.symIn}"></i>
-                    </button>
-                    <button type="button" class="btn k-btn dropdown-toggle"
-                            dropdown-toggle>
-                        <i class="arrow_triangle-down"></i>
-                        <span class="sr-only"></span>
-                    </button>
-                    <div class="dropdown-menu" role="menu"
-                         ng-click="$event.stopPropagation()">
-                        <header>
-                            <h4>Symbolic Input</h4>
-
-                            <p>
-                                <small>Make the standard input symbolic and
-                                  specify the size of the input.
-                                </small>
-                            </p>
-                        </header>
-
-                        <div class="form-group">
-                            <label>Input size (bytes)</label>
-                            <input type="text"
-                                   ng-model="config.symIn.size"
-                                   class="form-control"/>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="options-btn btn-group" dropdown>
-                    <button type="button" class="btn k-btn" ng-click="toggleOptions($event)" dropdown-toggle>
-                        Options
-                        <i ng-class="{'icon_box-empty': !opts.options, 'icon_box-checked': opts.options}"></i>
-                    </button>
-                    <button type="button" class="btn k-btn dropdown-toggle"
-                            dropdown-toggle>
-                        <i class="arrow_triangle-down"></i>
-                        <span class="sr-only"></span>
-                    </button>
-                    <div class="dropdown-menu" role="menu"
-                         ng-click="$event.stopPropagation()">
-                        <header>
-                            <h4>Options and Arguments</h4>
-
-                            <p>
-                                <small>
-                                  Provide Klee with more advanced option flags and program arguments.
-                                  See the <a href="http://klee.github.io/docs/" target="_blank">Documentation</a> to know more.
-                                </small>
-                            </p>
-                        </header>
-
-                        <div class="form-group">
-                            <label>Option flags</label>
-                            <input type="text"
-                                   ng-model="config.options"
-                                   placeholder="e.g. --help"
-                                   class="form-control"/>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Program arguments</label>
-                            <input type="text"
-                                   ng-model="config.arguments"
-                                   placeholder="e.g. --sym-stdout"
-                                   class="form-control"/>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="options-btn btn-group">
-                    <button ng-click="submission.runConfiguration.coverage_enabled = !submission.runConfiguration.coverage_enabled"
-                            type="button" class="btn k-btn coverage-btn"
-                            tooltip-placement="bottom"
-                            tooltip="Generate a coverage report for this run."
-                            tooltip-append-to-body="true">
-                        Coverage
-                        <i class=""
-                           ng-class="{'icon_box-empty': !submission.runConfiguration.coverage_enabled, 'icon_box-checked': submission.runConfiguration.coverage_enabled}"></i>
-                    </button>
-                </div>
+                <nav class="tabs">
+                    <ul>
+                        <li ng-class="{active: $parent.tabs.task.active}">
+                            <a href="#"
+                               ng-click="setTab('task')">Task</a>
+                        </li>
+                        <li ng-class="{active: $parent.tabs.solution.active}">
+                            <a href="#"
+                               ng-click="setTab('solution')">Solution</a>
+                        </li>
+                    </ul>
+                </nav>
 
                 <button type="submit" id="run-klee-btn"
                         class="btn k-btn run-klee-btn">
@@ -320,8 +167,29 @@
     </form>
 
     <div class="results" ng-cloak>
+    <div class="results-inner" ng-controller="ResultTabsCtrl" nanobar>
         <header>
-            <h3>KLEE Results</h3>
+            <nav class="tabs">
+                <ul>
+                    <li ng-class="{active: tabs.output.active}">
+                        <a href="#"
+                           ng-click="setTab('output')">Output</a>
+                    </li>
+                    <li ng-class="{active: tabs.stats.active}">
+                        <a href="#"
+                           ng-click="setTab('stats')">Stats</a>
+                    </li>
+                    <li ng-class="{active: tabs.coverage.active}"
+                        ng-if="result.coverage">
+                        <a href="#"
+                           ng-click="setTab('coverage')">Coverage</a>
+                    </li>
+                    <li ng-class="{active: tabs.testcases.active}">
+                        <a href="#"
+                           ng-click="setTab('testcases')">Test Cases</a>
+                    </li>
+                </ul>
+            </nav>
 
             <div class="download action-box"
                  ng-class="{'active': result.url, 'flash-color': result.url}">
@@ -340,155 +208,130 @@
 
         </header>
 
-        <div class="results-inner" ng-controller="ResultTabsCtrl" nanobar>
-            <header>
-                <nav class="tabs">
-                    <ul>
-                        <li ng-class="{active: tabs.output.active}">
-                            <a href="#"
-                               ng-click="setTab('output')">Output</a>
-                        </li>
-                        <li ng-class="{active: tabs.stats.active}">
-                            <a href="#"
-                               ng-click="setTab('stats')">Stats</a>
-                        </li>
-                        <li ng-class="{active: tabs.coverage.active}"
-                            ng-if="result.coverage">
-                            <a href="#"
-                               ng-click="setTab('coverage')">Coverage</a>
-                        </li>
-                        <li ng-class="{active: tabs.testcases.active}">
-                            <a href="#"
-                               ng-click="setTab('testcases')">Test Cases</a>
-                        </li>
-                    </ul>
-                </nav>
-            </header>
+        <div class="results-body">
+            <div class="tab-body">
 
-            <div class="results-body">
-                <div class="tab-body">
+                <div class="tab-content-inner klee-output"
+                     ng-show="tabs.output.active">
+                <pre class="progress-step code"
+                     ng-repeat="step in progress track by $index"
+                     ng-cloak>[[ step ]]</pre>
 
-                    <div class="tab-content-inner klee-output"
-                         ng-show="tabs.output.active">
-                    <pre class="progress-step code"
-                         ng-repeat="step in progress track by $index"
-                         ng-cloak>[[ step ]]</pre>
+            <pre class="code klee-command" id="klee-command"
+                 ng-if="result.klee_run.command | isNotEmpty">Ran command "[[ result.klee_run.command ]]".</pre>
 
-                <pre class="code klee-command" id="klee-command"
-                     ng-if="result.klee_run.command | isNotEmpty">Ran command "[[ result.klee_run.command ]]".</pre>
+                <pre class="code" id="result-output"
+                     ng-if="result.klee_run.output | isNotEmpty">[[ result.klee_run.output ]]</pre>
 
-                    <pre class="code" id="result-output"
-                         ng-if="result.klee_run.output | isNotEmpty">[[ result.klee_run.output ]]</pre>
+                <pre class="failed-header code"
+                     ng-show="result.failed_tests | isNotEmpty">Failed tests:</pre>
 
-                    <pre class="failed-header code"
-                         ng-show="result.failed_tests | isNotEmpty">Failed tests:</pre>
-
-                        <div class="failed-tests"
-                             ng-if="result.failed_tests | isNotEmpty">
-                            <div class="failed-test"
-                                 ng-repeat="fail in result.failed_tests">
-                                <pre class="error-description code">[[ fail.reason ]] on line [[ fail.line_no ]].</pre>
-                                <pre class="error-line code">[[ fail.line ]]</pre>
-                            </div>
+                    <div class="failed-tests"
+                         ng-if="result.failed_tests | isNotEmpty">
+                        <div class="failed-test"
+                             ng-repeat="fail in result.failed_tests">
+                            <pre class="error-description code">[[ fail.reason ]] on line [[ fail.line_no ]].</pre>
+                            <pre class="error-line code">[[ fail.line ]]</pre>
                         </div>
-
                     </div>
 
-                    <div class="tab-content-inner klee-output"
-                         ng-show="tabs.stats.active">
-                        <table class="table code">
-                            <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Value</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr ng-repeat="row in result.stats">
-                                <td>[[ row[0] ]]</td>
-                                <td>[[ row[1][0] ]]</td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                </div>
+
+                <div class="tab-content-inner klee-output"
+                     ng-show="tabs.stats.active">
+                    <table class="table code">
+                        <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Value</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr ng-repeat="row in result.stats">
+                            <td>[[ row[0] ]]</td>
+                            <td>[[ row[1][0] ]]</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
 
 
-                    <div class="tab-content-inner klee-coverage"
-                         ng-show="tabs.coverage.active">
-                        <pre class="coverage-stats code"> [[ linePercentage ]]% of lines covered.</pre>
-                        <div ui-codemirror="{ onLoad : codemirrorLoaded }"
-                             ui-refresh="tabs.coverage.active"
-                             class="cml-codemirror-refresh"></div>
-                    </div>
+                <div class="tab-content-inner klee-coverage"
+                     ng-show="tabs.coverage.active">
+                    <pre class="coverage-stats code"> [[ linePercentage ]]% of lines covered.</pre>
+                    <div ui-codemirror="{ onLoad : codemirrorLoaded }"
+                         ui-refresh="tabs.coverage.active"
+                         class="cml-codemirror-refresh"></div>
+                </div>
 
-                    <div class="tab-content-inner klee-testcases"
-                         ng-show="tabs.testcases.active"
-                         ng-controller="TestcasesPaginationCtrl">
-                        <div class="justify-content-center">
-                            <pagination ng-model="currentPage"
-                                        total-items="result.test_cases.length"
-                                        max-size="maxSize"
-                                        boundary-links="true"
-                                        items-per-page="1"
-                                        class="pagination-sm"
-                                        previous-text="&lsaquo;"
-                                        next-text="&rsaquo;"
-                                        first-text="&laquo;"
-                                        last-text="&raquo;">
-                            </pagination>
-                        </div>
-                        <div ng-repeat="desc in result.test_cases[currentPage - 1].desc">
-                            <pre class="progress-step code">[[ desc ]]</pre>
-                        </div>
-                        <table class="table code">
-                            <thead>
-                            <tr>
-                                <th style="width: 30px;"></th>
-                                <th>Object #</th>
-                                <th>Name</th>
-                                <th>Size</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr ng-repeat-start="mem_obj in result.test_cases[currentPage - 1].mem_objs">
-                                <td>
-{#                                    FIXME: fix button styling issue, for some reason can't use css class#}
-                                    <button style="background: #2f3133; color: #FFFFFF; border-radius: 3px; border-width: 1px"
-                                            ng-if="mem_obj.expanded" ng-click="mem_obj.expanded = false">
-{#                                        <span class="glyphicon glyphicon-chevron-down"></span>#}
-                                        <i class="arrow_triangle-down"></i>
-                                        <span class="sr-only"></span>
-                                    </button>
-                                    <button style="background: #2f3133; color: #FFFFFF; border-radius: 3px; border-width: 1px"
-                                            ng-if="!mem_obj.expanded" ng-click="mem_obj.expanded = true">
-{#                                        <span class="glyphicon glyphicon-chevron-right"></span>#}
-                                        <i class="arrow_triangle-right"></i>
-                                        <span class="sr-only"></span>
-                                    </button>
-                                </td>
-                                <td>[[ $index ]]</td>
-                                <td>[[ mem_obj.name ]]</td>
-                                <td>[[ mem_obj.size ]]</td>
-                            </tr>
-                            <tr ng-if="mem_obj.expanded" ng-repeat-end="">
-                                <td></td>
-                                <td colspan="3">
-                                    <table class="table code">
-                                        <tbody>
-                                        <tr ng-repeat="rep in mem_obj.representations">
-                                            <td>[[ rep[0] ]]</td>
-                                            <td>[[ rep[1] ]]</td>
-                                        </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
+                <div class="tab-content-inner klee-testcases"
+                     ng-show="tabs.testcases.active"
+                     ng-controller="TestcasesPaginationCtrl">
+                    <div class="justify-content-center">
+                        <pagination ng-model="currentPage"
+                                    total-items="result.test_cases.length"
+                                    max-size="maxSize"
+                                    boundary-links="true"
+                                    items-per-page="1"
+                                    class="pagination-sm"
+                                    previous-text="&lsaquo;"
+                                    next-text="&rsaquo;"
+                                    first-text="&laquo;"
+                                    last-text="&raquo;">
+                        </pagination>
                     </div>
+                    <div ng-repeat="desc in result.test_cases[currentPage - 1].desc">
+                        <pre class="progress-step code">[[ desc ]]</pre>
+                    </div>
+                    <table class="table code">
+                        <thead>
+                        <tr>
+                            <th style="width: 30px;"></th>
+                            <th>Object #</th>
+                            <th>Name</th>
+                            <th>Size</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr ng-repeat-start="mem_obj in result.test_cases[currentPage - 1].mem_objs">
+                            <td>
+{#                                FIXME: fix button styling issue, for some reason can't use css class#}
+                                <button style="background: #2f3133; color: #FFFFFF; border-radius: 3px; border-width: 1px"
+                                        ng-if="mem_obj.expanded" ng-click="mem_obj.expanded = false">
+{#                                    <span class="glyphicon glyphicon-chevron-down"></span>#}
+                                    <i class="arrow_triangle-down"></i>
+                                    <span class="sr-only"></span>
+                                </button>
+                                <button style="background: #2f3133; color: #FFFFFF; border-radius: 3px; border-width: 1px"
+                                        ng-if="!mem_obj.expanded" ng-click="mem_obj.expanded = true">
+{#                                    <span class="glyphicon glyphicon-chevron-right"></span>#}
+                                    <i class="arrow_triangle-right"></i>
+                                    <span class="sr-only"></span>
+                                </button>
+                            </td>
+                            <td>[[ $index ]]</td>
+                            <td>[[ mem_obj.name ]]</td>
+                            <td>[[ mem_obj.size ]]</td>
+                        </tr>
+                        <tr ng-if="mem_obj.expanded" ng-repeat-end="">
+                            <td></td>
+                            <td colspan="3">
+                                <table class="table code">
+                                    <tbody>
+                                    <tr ng-repeat="rep in mem_obj.representations">
+                                        <td>[[ rep[0] ]]</td>
+                                        <td>[[ rep[1] ]]</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
+    </div>
     </div>
 
 
@@ -505,6 +348,10 @@
 <script src="{{ dist }}js/vendor/angular-ui-slider.min.js"></script>
 <script src="{{ dist }}js/vendor/angular-file-upload.min.js"></script>
 <script src="{{ dist }}js/vendor/nanobar.min.js"></script>
+<script src="{{ dist }}js/vendor/angular-sanitize.min.js"></script>
+<script src="{{ dist }}js/vendor/marked.min.js"></script>
+<script src="{{ dist }}js/vendor/angular-marked.min.js"></script>
+<script src="{{ dist }}js/vendor/highlight.min.js"></script>
 <script src="//angular-ui.github.io/bootstrap/ui-bootstrap-tpls-0.12.0.js"></script>
 
 <script src="{{ dist }}js/app.min.js"></script>

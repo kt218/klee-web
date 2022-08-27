@@ -71,6 +71,7 @@ class Migration(migrations.Migration):
                 ('example', models.BooleanField(default=False)),
                 ('default_file', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='default_project', to='frontend.File')),
                 ('owner', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                ('game', models.BooleanField(default=False)),
             ],
         ),
         migrations.CreateModel(
@@ -88,9 +89,25 @@ class Migration(migrations.Migration):
                 ('user', models.CharField(default=b'Guest', max_length=40)),
             ],
         ),
+        migrations.CreateModel(
+            name='GameChallenge',
+            fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('project', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='frontend.Project')),
+                ('name', models.TextField()),
+                ('task_md', models.TextField()),
+                ('solution_code', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to='frontend.File')),
+                ('default_user_code', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='default_challenge', to='frontend.File')),
+            ],
+        ),
         migrations.AddField(
             model_name='file',
             name='project',
             field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='frontend.Project'),
+        ),
+        migrations.AddField(
+            model_name='file',
+            name='challenge',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='user_codes', to='frontend.GameChallenge'),
         ),
     ]

@@ -29,6 +29,7 @@ class Project(models.Model):
                               blank=True)
     name = models.TextField()
     example = models.BooleanField(default=False)
+    game = models.BooleanField(default=False)
     default_file = models.ForeignKey("File",
                                      on_delete=models.CASCADE,
                                      null=True,
@@ -61,30 +62,29 @@ class File(models.Model):
 
     last_modified = models.DateTimeField(auto_now=True)
 
+    challenge = models.ForeignKey("GameChallenge",
+                                  on_delete=models.CASCADE,
+                                  null=True,
+                                  blank=True,
+                                  related_name="user_codes")
+
     def __unicode__(self):
         return self.name
 
 
 class GameChallenge(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
-    # TODO: FIX THE MODELS!
+
     name = models.TextField()
-    fn_signature = models.TextField()
-    solution_code = models.ForeignKey(File, on_delete=models.CASCADE)
-
-    challenge_md = models.TextField()
-
-    num_files = models.IntegerField(default=0)
-    size_files = models.IntegerField(default=0)
-
-    size_sym_in = models.IntegerField(default=0)
-
-    min_sym_args = models.IntegerField(default=0)
-    max_sym_args = models.IntegerField(default=0)
-    size_sym_args = models.IntegerField(default=0)
-
-    options = models.TextField(null=True)  # TODO: add -max-time=10min
-    arguments = models.TextField(null=True)
+    task_md = models.TextField()
+    solution_code = models.OneToOneField(File,
+                                         on_delete=models.CASCADE)
+    # options = models.TextField(null=True)  # TODO: add -max-time=10min
+    default_user_code = models.ForeignKey("File",
+                                          on_delete=models.CASCADE,
+                                          null=True,
+                                          blank=True,
+                                          related_name="default_challenge")
 
     def __unicode__(self):
         return self.name

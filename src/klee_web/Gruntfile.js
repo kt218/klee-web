@@ -115,7 +115,20 @@ module.exports = function (grunt) {
                         cwd: '<%= config.lib %>/nanobar',
                         src: 'nanobar.min.js',
                         dest: '<%= config.frontend_dist %>/js/vendor'
-                    }
+                    },
+                    // Highlightjs github styles
+                    {
+                        expand: true,
+                        cwd: '<%= config.lib %>/highlightjs/styles',
+                        src: ['*.css'],
+                        dest: '<%= config.frontend_dist %>/css/vendor/highlightjs/styles'
+                    },
+                    {
+                        expand: true,
+                        cwd: '<%= config.lib %>/angular-sanitize',
+                        src: 'angular-sanitize.min.js',
+                        dest: '<%= config.frontend_dist %>/js/vendor'
+                    },
         		]
         	}
         },
@@ -163,6 +176,15 @@ module.exports = function (grunt) {
                     ],
                     '<%= config.frontend_dist %>/js/vendor/angular-ui-slider.min.js': [
                         '<%= bower.directory %>/angular-ui-slider/src/slider.js',
+                    ],
+                    '<%= config.frontend_dist %>/js/vendor/marked.min.js': [
+                        '<%= bower.directory %>/marked/lib/marked.js',
+                    ],
+                    '<%= config.frontend_dist %>/js/vendor/highlight.min.js': [
+                        '<%= bower.directory %>/highlightjs/highlight.pack.js',
+                    ],
+                    '<%= config.frontend_dist %>/js/vendor/angular-marked.min.js': [
+                        '<%= bower.directory %>/angular-marked/dist/angular-marked.js',
                     ],
 
                     // Application JS

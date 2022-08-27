@@ -8,7 +8,7 @@
 		[row-header-start] "sidebar main-btns main-btns" $topbar-height [row-header-end]
 		[row-top-start] "sidebar task editor" 45% [row-top-end]
 		[row-bottom-start] "sidebar task result" 1fr [row-bottom-end]
-		/ $sidebar-width 1fr 1fr;
+		/ $sidebar-width 3fr 4fr;
 	place-content: stretch;
 }
 
@@ -28,8 +28,37 @@
 	grid-area: task;
 	place-content: stretch;
 	border-right: $border-width solid $vertical-sep-border-color;
-	// TODO: extend for more styling
+	background-color: gainsboro;
+	padding: 5%;
+	overflow-y: auto;
+
+	.CodeMirror {
+		background: transparent;
+		height: calc(100% - 10px);
+		.CodeMirror-code {
+			.cm-comment, .cm-meta {color:#94b3d7}
+			.cm-keyword, .cm-property {color:#5784cf}
+			.cm-atom, .cm-number {color:#b64a4a}
+			.cm-node, .cm-tag {color:#9c3328}
+			.cm-string {color:#b64a4a}
+			.cm-variable, .cm-qualifier {color:#3f4146}
+		}
+		padding-top: 10px;
+		z-index: 0;
+
+		.CodeMirror-gutter {
+			width: 40px;
+		}
+
+		.CodeMirror-linenumber {
+			padding-right: 10px;
+			color: $line-nums-color;
+		}
+	}
 }
+
+@import "components/editor";
+@import "components/results";
 
 .editor {
 	grid-area: editor;
@@ -45,11 +74,61 @@
 			height: $topbar-height;
 			width: 100%;
 			z-index: 2;
+
+			.options-btn {
+				margin-top: ($topbar-height - $k-btn-height) / 2;
+				margin-right: 10px;
+			}
+
+			.tabs {
+				float: left;
+				width: auto;
+				height: 100%;
+
+				ul {
+					float: left;
+					width: 100%;
+					padding-left: 20px;
+					margin-top: ($topbar-height - 30px) / 2;
+
+					li {
+						float: left;
+						margin: 0 10px;
+						height: 30px;
+						padding: 0 15px;
+						border-radius: 3px;
+						border: $border-width solid transparent;
+						text-align: center;
+						font-size: 0.82em;
+						font-weight: 700;
+						text-transform: uppercase;
+						display: table;
+						background-color: $klee-opt-btn-bg-color;
+
+						a {
+							display: table-cell;
+							vertical-align: middle;
+							color: lightgrey;
+						}
+
+						&:hover {
+							background-color: lighten($run-klee-btn-bg-color, 5%);
+							a { color: #FFF; }
+						}
+
+						&.active {
+							background-color: $klee-opt-btn-bg-color;
+							border-color: $console-tab-border-color;
+							a { color: #FFF; }
+						}
+					}
+				}
+			}
 		}
 	}
 
 	.CodeMirror {
-		height: auto;
+		height: calc(100% - 10px);
 		.CodeMirror-code {
 			.cm-comment, .cm-meta {color:#94b3d7}
 			.cm-keyword, .cm-property {color:#5784cf}
@@ -64,13 +143,81 @@
 .results {
 	grid-area: result;
 	place-content: stretch;
-	padding-bottom: $topbar-height +3px;
+	padding-bottom: 5px;
 
-	&> header {
+	& > header {
 		position: relative;
-    }
+	}
 }
 
-@import "components/editor";
-@import "components/results";
+.results .results-inner {
+	padding-top: 1px;
+	margin-top: -1px;
 
+	& > header {
+		background-color: $results-body-bg-color;
+
+		.tabs {
+			width: auto;
+		}
+
+		.action-box {
+			float: right;
+			height: $topbar-height - 8px;
+			width: $topbar-height;
+			border-left: $border-width solid $results-header-border-color;
+			display: table;
+
+			a {
+				width: 100%;
+				display: table-cell;
+				text-align: center;
+				vertical-align: middle;
+				font-size: 1.5em;
+				color: $dark-disabled-color;
+
+
+				&:hover {
+					color: $dark-disabled-color;
+					cursor: default;
+				}
+			}
+
+			&.active {
+				a {
+					color: $dark-active-color;
+
+					&:hover {
+						color: #FFF;
+						-webkit-transition: color 0.2s ease-in-out;
+						transition: color 0.2s ease-in-out;
+						cursor: pointer;
+					}
+				}
+			}
+
+			&.flash-color {
+				a {
+					-webkit-animation-name: flashColor;
+					animation-name: flashColor;
+					-webkit-animation-duration: 1.5s;
+					animation-duration: 1.5s;
+					-webkit-animation-delay: 0s;
+					animation-delay: 0s;
+					-webkit-animation-iteration-count: 1;
+					animation-iteration-count: 1;
+				}
+			}
+
+			&.download {
+				a {
+					padding-top: 5px;
+				}
+			}
+		}
+	}
+
+	.tab-body .tab-content-inner {
+		padding: 10px 20px;
+	}
+}

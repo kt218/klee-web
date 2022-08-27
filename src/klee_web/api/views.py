@@ -1,4 +1,5 @@
 import datetime
+import json
 
 from django.urls import reverse
 
@@ -12,15 +13,16 @@ from rest_framework.decorators import list_route
 
 from api.helpers import get_client_ip
 from api.permissions import IsOwnerOrReadOnly
-from api.serializers import ProjectSerializer, FileSerializer
-from frontend.models import Project, File, Task
+from api.serializers \
+    import ProjectSerializer, FileSerializer, GameChallengeSerializer
+from frontend.models import Project, File, Task, GameChallenge
 
 from worker.worker import submit_code
 from worker.worker_config import WorkerConfig
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
-    permission_classes = (IsOwnerOrReadOnly, )
+    permission_classes = (IsOwnerOrReadOnly,)
     serializer_class = ProjectSerializer
     queryset = Project.objects
 
@@ -29,6 +31,12 @@ class ProjectViewSet(viewsets.ModelViewSet):
         queryset = Project.objects.filter(example=True)
         if user.is_authenticated:
             queryset |= Project.objects.filter(owner=user)
+
+        game = self.request.query_params.get('game')
+        if game:
+            game = json.loads(game)
+            queryset = queryset.filter(game=game)
+
         return queryset
 
     def perform_create(self, serializer):
@@ -41,8 +49,9 @@ class FileViewSet(viewsets.ViewSet):
     queryset = File.objects.all()
     serializer_class = FileSerializer
 
-    def list(self, request, project_pk=None):
-        files = self.queryset.filter(project=project_pk)
+    def list(self, request, project_pk=None, challenge_pk=None):
+        files = self.queryset.filter(project=project_pk,
+                                     challenge=challenge_pk)
         serializer = FileSerializer(files,
                                     many=True,
                                     context={"request": request})
@@ -109,3 +118,50 @@ class JobViewSet(viewsets.ViewSet):
                             user=user)
 
         return Response({'task_id': task.task_id})
+
+
+class GameChallengeViewSet(viewsets.ModelViewSet):
+    # TODO: unsure which permission to use
+    permission_classes = (IsAuthenticatedOrReadOnly, )
+    parser_classes = (MultiPartParser, FormParser, CamelCaseJSONParser)
+    queryset = GameChallenge.objects.all()
+    serializer_class = GameChallengeSerializer
+
+    def list(self, request, project_pk=None):
+        challenges = self.queryset.filter(project=project_pk)
+        serializer = GameChallengeSerializer(challenges,
+                                             many=True,
+                                             context={"request": request})
+        return Response(serializer.data)
+
+    def create(self, request, project_pk=None):
+        # challenge_data = request.data
+
+        # TODO: change to allow anyone as moderator/approved can add challenges
+        project = get_object_or_404(Project, pk=project_pk, owner=request.user)
+
+        # FIXME? unsure if needed to create solution code or will serializer
+        #  do it for me
+        # solution_code = FileSerializer(data=challenge_data['solution_code'])
+        # solution_code.is_valid(raise_exception=True)
+        # solution_code.save(project=project)
+
+        serializer = GameChallengeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(project=project)  # , solution_code=solution_code)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, pk=None, project_pk=None):
+        # TODO: change to allow anyone as moderator/approved can add challenges
+        project = get_object_or_404(Project, pk=project_pk, owner=request.user)
+        instance = GameChallenge.objects.get(pk=pk, project=project)
+        serializer = GameChallengeSerializer(instance, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, pk=None, project_pk=None):
+        project = get_object_or_404(Project, pk=project_pk, owner=request.user)
+        instance = GameChallenge.objects.get(pk=pk, project=project)
+        instance.delete()
+        return Response("")

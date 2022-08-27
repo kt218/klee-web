@@ -18,13 +18,15 @@ def load_fixtures(apps, schema_editor):
         add_fixtures(apps, fixtures, "Tutorials")
         # Create example project
         add_fixtures(apps, fixtures, "Examples")
+        # Create game challenges
+        add_challenges(apps, fixtures, "Challenges")
 
 
 def add_fixtures(apps, fixtures, title):
     Project = apps.get_model("frontend", "Project")
     File = apps.get_model("frontend", "File")
             
-    project = Project(name=title, example=True)
+    project = Project(name=title, example=True, game=False)
     project.save()
     for fixture in fixtures.get(title, []):
         figure = File(**fixture)
@@ -33,6 +35,37 @@ def add_fixtures(apps, fixtures, title):
             figure.code = code.read()
         figure.project = project
         figure.save()
+
+
+def add_challenges(apps, fixtures, title):
+    Project = apps.get_model("frontend", "Project")
+    File = apps.get_model("frontend", "File")
+    GameChallenge = apps.get_model("frontend", "GameChallenge")
+
+    project = Project(name=title, example=True, game=True)
+    project.save()
+    for challenge in fixtures.get(title, []):
+        solution = File(**challenge)
+        solution.name = f'{challenge["name"]}_sol.c'
+        code_path = os.path.join(FIXTURE_DIR,
+                                 title,
+                                 challenge["name"],
+                                 'solution.c')
+        with open(code_path, 'r') as code:
+            solution.code = code.read()
+        solution.project = project
+        solution.save()
+
+        game_challenge = GameChallenge(name=challenge["name"],
+                                       project=project,
+                                       solution_code=solution)
+        md_path = os.path.join(FIXTURE_DIR,
+                               title,
+                               challenge["name"],
+                               'task.md')
+        with open(md_path, 'r') as md:
+            game_challenge.task_md = md.read()
+        game_challenge.save()
 
 
 class Migration(migrations.Migration):

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from frontend.models import Project, File
+from frontend.models import Project, File, GameChallenge
 
 
 class ProjectSerializer(serializers.HyperlinkedModelSerializer):
@@ -8,7 +8,7 @@ class ProjectSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'name', 'default_file', 'example')
+        fields = ('id', 'name', 'default_file', 'example', 'game')
 
 
 class RunConfigurationField(serializers.Field):
@@ -48,6 +48,8 @@ class RunConfigurationField(serializers.Field):
 class FileSerializer(serializers.HyperlinkedModelSerializer):
     run_configuration = RunConfigurationField()
     project_id = serializers.PrimaryKeyRelatedField(read_only=True)
+    challenge_id = serializers.PrimaryKeyRelatedField(
+        queryset=GameChallenge.objects.all(), default=None)
 
     def create(self, validated_data):
         # Hack to unpack run configuration to fields in the model
@@ -64,4 +66,17 @@ class FileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = File
-        fields = ('id', 'name', 'code', 'run_configuration', 'project_id')
+        fields = ('id', 'name', 'code', 'run_configuration', 'project_id',
+                  'challenge_id')
+
+
+class GameChallengeSerializer(serializers.HyperlinkedModelSerializer):
+    project_id = serializers.PrimaryKeyRelatedField(read_only=True)
+    solution_code = FileSerializer()
+    default_user_code = serializers.PrimaryKeyRelatedField(
+        queryset=File.objects.all(), default=None)
+
+    class Meta:
+        model = GameChallenge
+        fields = ('id', 'name', 'task_md', 'project_id', 'solution_code',
+                  'default_user_code')

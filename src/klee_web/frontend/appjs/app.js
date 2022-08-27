@@ -4,11 +4,13 @@ var app = angular.module('app', [
     'ngResource',
     'ngCookies',
     'ngAnimate',
+    'ngSanitize',
     'ui.codemirror',
     'ui.bootstrap',
     'ui.bootstrap.dropdown',
     'ui.slider',
     'angularFileUpload',
+    'hc.marked',
 
     // App
     'services',
@@ -19,10 +21,28 @@ var app = angular.module('app', [
 
 app.config([
     '$httpProvider', '$interpolateProvider', '$resourceProvider',
-    function ($httpProvider, $interpolateProvider, $resourceProvider) {
+    'markedProvider',
+    function ($httpProvider, $interpolateProvider, $resourceProvider,
+              markedProvider) {
         $interpolateProvider.startSymbol('[[');
         $interpolateProvider.endSymbol(']]');
         $resourceProvider.defaults.stripTrailingSlashes = false;
+        markedProvider.setOptions({
+            gfm: true,
+            tables: true,
+            breaks: false,
+            pedantic: false,
+            sanitize: false,
+            smartLists: true,
+            smartypants: false,
+            highlight: function (code, lang) {
+                if (lang) {
+                    return hljs.highlight(lang, code, true).value;
+                } else {
+                    return hljs.highlightAuto(code).value;
+                }
+            }
+        });
     }
 ]);
 

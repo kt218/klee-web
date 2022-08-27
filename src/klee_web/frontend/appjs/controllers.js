@@ -1,14 +1,21 @@
 var controllers = angular.module('controllers', []);
 
 controllers.controller('MainCtrl', [
-    '$scope', '$http', '$rootScope', 'Project', 'File', '$interval',
-    function($scope, $http, $rootScope, Project, File, $interval) {
+    '$scope', '$http', '$rootScope', 'Project', 'File', 'GameChallenge',
+    'ChallengeFile', '$interval',
+    function($scope, $http, $rootScope, Project, File, GameChallenge,
+             ChallengeFile, $interval) {
 
         $scope.submission = {
             name: null,
             code: ''
         };
-        
+
+        $scope.solutionCode = {
+            name: null,
+            code: '// MISSING: solution code',
+        }
+
         $scope.opts = {
             symArgs: false,
             symFiles: false,
@@ -45,6 +52,15 @@ controllers.controller('MainCtrl', [
 
         $scope.projects = [];
         $scope.files = [];
+        $scope.challenges = [];
+        $scope.challenge = {
+            name: null,
+            md: '# IF YOU SEE THIS SOMETHING WENT WRONG',
+            solutionCode: {
+                name: null,
+                code: '// MISSING: solution code',
+            },
+        };
 
         $scope.toggleSymArgs = function ($event) {
             $event.preventDefault();
@@ -112,10 +128,20 @@ controllers.controller('MainCtrl', [
             $scope.result = {};
             $scope.progress = [];
             $scope.progress.push('Job queued!');
+            const submissionCopy = angular.copy(submission);
+
+            if ($scope.selectedProject.game) {
+                submissionCopy.code = $scope.challenge.solutionCode.code +
+                    '\n\n' + submission.code;
+                // Ensure klee run will time out at 10min
+                submissionCopy.runConfiguration.coverage_enable = true;
+                submissionCopy.runConfiguration.options += '-max-time=10min';
+                // TODO: add more options for search-heuristics
+            }
 
             // Send data to submit endpoint
             $http
-                .post('/api/jobs/submit/', submission)
+                .post('/api/jobs/submit/', submissionCopy)
 
             // We get a task id from submitting!
             .success(
@@ -149,7 +175,7 @@ controllers.controller('MainCtrl', [
                 $rootScope.finishNanobar();
               }
             );
-          };
+        };
 
         $scope.codemirrorLoaded = function(_editor) {
             $scope.editor = _editor;
@@ -214,13 +240,37 @@ controllers.controller('EditorCtrl', [
             },
             theme: 'neo'
         };
+
+        $scope.$parent.tabs = {
+            task: {
+                active: true
+            },
+            solution: {
+                active: false
+            },
+        };
+
+        $scope.hideAllTabs = function() {
+            angular.forEach($scope.$parent.tabs, function(tab, name) {
+                $scope.$parent.tabs[name].active = false;
+            });
+        };
+
+        $scope.setTab = function(tab) {
+            if (tab in $scope.$parent.tabs) {
+                $scope.hideAllTabs();
+                $scope.$parent.tabs[tab].active = true;
+            }
+        };
     }
 ]);
 
 
 controllers.controller('SidebarCtrl', [
-    '$scope', 'Project', 'File', 'FileUploader', '$cookies',
-    function($scope, Project, File, FileUploader, $cookies) {
+    '$scope', 'Project', 'File', 'GameChallenge', 'ChallengeFile', 'FileUploader',
+    '$cookies', '$location',
+    function($scope, Project, File, GameChallenge, ChallengeFile, FileUploader,
+             $cookies, $location) {
 
         function refreshFiles (projectId, selectedFileId) {
             var refreshFiles = File.query({
@@ -234,7 +284,31 @@ controllers.controller('SidebarCtrl', [
                 });
                 $scope.selectFile(selectedFile);
             });
-        };
+        }
+
+        function refreshChallenges(projectId, selectedChallengeId) {
+            let selectedChallenge;
+
+            GameChallenge.query({
+                projectId: projectId
+            }).$promise.then(function(challenges) {
+                $scope.challenges = challenges;
+                if (!selectedChallengeId) {
+                    selectedChallenge = challenges[0];
+                } else {
+                    selectedChallenge = _.findWhere($scope.challenges, {
+                        id: selectedChallengeId
+                    });
+                }
+                return ChallengeFile.query({
+                    projectId: projectId,
+                    challengeId: selectedChallenge.id
+                }).$promise;
+            }).then(function(files) {
+                $scope.files = files;
+                $scope.selectChallenge(selectedChallenge);
+            });
+        }
 
         $scope.projectToAdd = false;
         $scope.newFile = {
@@ -261,7 +335,9 @@ controllers.controller('SidebarCtrl', [
             },
         });
 
-        Project.query().$promise.then(function(projects) {
+        Project.query({
+            game: $location.absUrl().includes('game')
+        }).$promise.then(function(projects) {
             $scope.projects = projects;
             $scope.projects.push($scope.newProjectOpt);
 
@@ -278,10 +354,32 @@ controllers.controller('SidebarCtrl', [
                     // Update file uploader
                     $scope.uploader.url = 'api/projects/' + project.id + '/files/upload/';
 
-                    refreshFiles(project.id, project.defaultFile);
+                    if (project.game) {
+                        refreshChallenges(project.id, project.defaultChallenge);
+                    } else {
+                        refreshFiles(project.id, project.defaultFile);
+                    }
                 }
+                /*// Switch to /game when selectedProject is a GameChallenge
+                if (project.game && $location.path() !== '/game') {
+                    console.log($location.path());
+                    $location.path('/game');
+                }
+                // Back to home if not game
+                if (!project.game && $location.path() !== '/') {
+                    console.log($location.path());
+                    $location.path('/');
+                }*/
             } else {
+                // TODO: Needed? Back to home if not game
+                /*if (!project.game && $location.path() !== '/') {
+                    $location.path('/');
+                }
+                if ($location.path() === '/game') {
+                    $scope.$parent.selectedProject = $scope.$parent.projects[2];
+                }*/
                 $scope.files = [];
+                $scope.challenges = [];
                 $scope.resetLoadedFile();
             }
         });
@@ -303,6 +401,34 @@ controllers.controller('SidebarCtrl', [
             } else {
                 $scope.resetLoadedFile();
             }
+        };
+
+        $scope.selectChallenge = function(challenge) {
+            const selectedProject = $scope.$parent.selectedProject;
+            $scope.$parent.challenge = challenge;
+            // TODO: fix so that default will be user's actual code file
+            if (!!$scope.files.length) {
+                challenge.defaultUserCode = $scope.files[0].id;
+            } else {
+                $scope.resetLoadedFile();
+                const submission = $scope.$parent.submission;
+                submission.name = challenge.name;
+                submission.projectId = challenge.projectId;
+                submission.challengeId = challenge.id;
+                challenge.defaultUserCode = submission;
+            }
+            selectedProject.defaultChallenge = challenge.id;
+            const solutionCode = challenge.solutionCode;
+            for (opt in $scope.opts) {
+                if (
+                    solutionCode.runConfiguration &&
+                    solutionCode.runConfiguration[opt] &&
+                    solutionCode.runConfiguration[opt].size
+                ) {
+                    $scope.opts[opt] = true;
+                }
+            }
+            $scope.$parent.config = solutionCode.runConfiguration;
         };
 
         $scope.resetProjectSelector = function() {
@@ -422,12 +548,39 @@ controllers.controller('ResultTabsCtrl', [
 
 controllers.controller('TestcasesPaginationCtrl', [
     '$scope',
-    function($scope){
+    function($scope) {
         // Pagination settings
         $scope.currentPage = 1;
         $scope.maxSize = 5;
 
         $scope.$watch('currentPage', function() {
-        })
+        });
+    }
+]);
+
+controllers.controller('TaskMarkedCtrl', [
+    '$scope', 'marked',
+    function($scope, marked) {
+        $scope.md = $scope.$parent.challenge.taskMd;
+        $scope.mdHtml = '';
+
+        $scope.editorOptions = {
+            viewportMargin: 5,
+            lineWrapping: true,
+            lineNumbers: true,
+            mode: {
+                name: 'text/x-csrc',
+                useCPP: true
+            },
+            readOnly: 'nocursor',
+            theme: 'neo',
+        };
+
+        $scope.$watch('$parent.challenge', function(challenge) {
+            let md = challenge.taskMd;
+            if (!md)
+                md = '# This is blank...';
+            $scope.mdHtml = marked(md);
+        });
     }
 ]);
