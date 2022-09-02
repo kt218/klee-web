@@ -37,7 +37,7 @@
 		height: calc(100% - 10px);
 		.CodeMirror-code {
 			.cm-comment, .cm-meta {color:#94b3d7}
-			.cm-keyword, .cm-property {color:#5784cf}
+			.cm-keyword, .cm-property {color:#a50}
 			.cm-atom, .cm-number {color:#b64a4a}
 			.cm-node, .cm-tag {color:#9c3328}
 			.cm-string {color:#b64a4a}
@@ -48,11 +48,13 @@
 
 		.CodeMirror-gutter {
 			width: 40px;
+			//background-color: transparent;
 		}
 
 		.CodeMirror-linenumber {
 			padding-right: 10px;
 			color: $line-nums-color;
+			//background: transparent;
 		}
 	}
 }
@@ -214,10 +216,61 @@
 					padding-top: 5px;
 				}
 			}
+
+			&.test-nos {
+				width: auto;
+
+				&>.test-no {
+					height: 50%;
+					width: auto;
+					margin: 5px;
+					color: $dark-disabled-color;
+					font-size: 13px;
+					display: block;
+					text-align: right;
+
+					&.passed {
+						color: #458345;
+						font-weight: bold;
+					}
+					&.failed {
+						color: $console-error-color;
+						font-weight: bold;
+					}
+				}
+			}
 		}
 	}
 
 	.tab-body .tab-content-inner {
 		padding: 10px 20px;
+
+		&.klee-replay .replays {
+
+			.replay {
+				background: none;
+				border: none;
+				border-radius: 0;
+				color: $console-output-color;
+				margin-bottom: 5px;
+				padding: 0 10px 0 10px;
+
+				&.error-description {
+					color: $console-error-color;
+				}
+			}
+
+			.replay-header {
+				padding-top: 10px;
+				font-weight: 700;
+				background: none;
+				border: none;
+				border-radius: 0;
+				color: $console-output-color;
+				margin-bottom: 5px;
+				padding-left: 10px;
+				padding-right: 10px;
+			}
+		}
 	}
 }

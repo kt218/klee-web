@@ -6,6 +6,7 @@
 <link href="{{ dist }}css/vendor/codemirror/codemirror.css"
       rel="stylesheet">
 <link href="{{ dist }}css/vendor/codemirror/theme/neo.css" rel="stylesheet">
+<link href="{{ dist }}css/vendor/codemirror/theme/elegant.css" rel="stylesheet">
 <link href="{{ dist }}css/vendor/jquery-ui.min.css" rel="stylesheet">
 <link href="{{ dist }}css/game.css" rel="stylesheet">
 <link href="{{ dist }}css/vendor/highlightjs/styles/github.css" rel="stylesheet">
@@ -119,9 +120,15 @@
              ng-show="$parent.tabs.task.active"></div>
         <div ng-show="$parent.tabs.solution.active">
             <div ui-codemirror id="codemirrorSolution"
-                 ng-model="$parent.challenge.solutionCode.code"
+                 ng-model="$parent.challenge.solutionCode"
                  ui-refresh="$parent.tabs.solution.active"
-                 ui-codemirror-opts="editorOptions"></div>
+                 ui-codemirror-opts="solutionEditorOptions"></div>
+        </div>
+        <div ng-show="$parent.tabs.main.active">
+            <div ui-codemirror id="codemirrorTestfile"
+                 ng-model="$parent.challenge.mainCode.code"
+                 ui-refresh="$parent.tabs.main.active"
+                 ui-codemirror-opts="testfileEditorOptions"></div>
         </div>
     </div>
 
@@ -145,6 +152,10 @@
                         <li ng-class="{active: $parent.tabs.solution.active}">
                             <a href="#"
                                ng-click="setTab('solution')">Solution</a>
+                        </li>
+                        <li ng-class="{active: $parent.tabs.main.active}">
+                            <a href="#"
+                               ng-click="setTab('main')">Test file</a>
                         </li>
                     </ul>
                 </nav>
@@ -184,9 +195,13 @@
                         <a href="#"
                            ng-click="setTab('coverage')">Coverage</a>
                     </li>
+                    <li ng-class="{active: tabs.replays.active}">
+                        <a href="#"
+                           ng-click="setTab('replays')">Tests</a>
+                    </li>
                     <li ng-class="{active: tabs.testcases.active}">
                         <a href="#"
-                           ng-click="setTab('testcases')">Test Cases</a>
+                           ng-click="setTab('testcases')">Details</a>
                     </li>
                 </ul>
             </nav>
@@ -206,6 +221,15 @@
                 </a>
             </div>
 
+            <div class="action-box test-nos">
+                <a class="test-no" ng-class="{passed: passedNo}">
+                    Passed: [[ passedNo ]]
+                </a>
+                <a class="test-no" ng-class="{failed: failedNo}">
+                    Failed: [[ failedNo ]]
+                </a>
+            </div>
+
         </header>
 
         <div class="results-body">
@@ -213,23 +237,24 @@
 
                 <div class="tab-content-inner klee-output"
                      ng-show="tabs.output.active">
-                <pre class="progress-step code"
-                     ng-repeat="step in progress track by $index"
-                     ng-cloak>[[ step ]]</pre>
+                    <pre class="progress-step code"
+                         ng-repeat="step in progress track by $index"
+                         ng-cloak>[[ step ]]</pre>
 
-            <pre class="code klee-command" id="klee-command"
-                 ng-if="result.klee_run.command | isNotEmpty">Ran command "[[ result.klee_run.command ]]".</pre>
+                    <pre class="code klee-command" id="klee-command"
+                         ng-if="result.klee_run.command | isNotEmpty">Ran command "[[ result.klee_run.command ]]".</pre>
 
-                <pre class="code" id="result-output"
-                     ng-if="result.klee_run.output | isNotEmpty">[[ result.klee_run.output ]]</pre>
+                    <pre class="code" id="result-output"
+                         ng-if="result.klee_run.output | isNotEmpty">[[ result.klee_run.output ]]</pre>
 
-                <pre class="failed-header code"
-                     ng-show="result.failed_tests | isNotEmpty">Failed tests:</pre>
+                    <pre class="failed-header code"
+                         ng-show="result.failed_tests | isNotEmpty">Failed tests: (more details available in Tests tab)</pre>
 
                     <div class="failed-tests"
                          ng-if="result.failed_tests | isNotEmpty">
                         <div class="failed-test"
                              ng-repeat="fail in result.failed_tests">
+                            <pre class="error-description code">Found in testcase [[ fail.file_no ]]</pre>
                             <pre class="error-description code">[[ fail.reason ]] on line [[ fail.line_no ]].</pre>
                             <pre class="error-line code">[[ fail.line ]]</pre>
                         </div>
@@ -264,6 +289,19 @@
                          class="cml-codemirror-refresh"></div>
                 </div>
 
+                <div class="tab-content-inner klee-replay"
+                     ng-show="tabs.replays.active">
+                    <div class="replays" ng-repeat="replay in replays">
+                        <pre class="replay-header">Testcase [[ replay.fileNo ]]:</pre>
+                        <pre class="replay"
+                             ng-class="{'error-description': replay.failed}">[[ replay.inp ]]</pre>
+                        <pre class="replay"
+                             ng-class="{'error-description': replay.failed}">[[ replay.sol_out ]]</pre>
+                        <pre class="replay"
+                             ng-class="{'error-description': replay.failed}">[[ replay.your_out ]]</pre>
+                    </div>
+                </div>
+
                 <div class="tab-content-inner klee-testcases"
                      ng-show="tabs.testcases.active"
                      ng-controller="TestcasesPaginationCtrl">
@@ -281,7 +319,8 @@
                         </pagination>
                     </div>
                     <div ng-repeat="desc in result.test_cases[currentPage - 1].desc">
-                        <pre class="progress-step code">[[ desc ]]</pre>
+                        <pre class="progress-step code"
+                             ng-class="isFailedTest(currentPage)">[[ desc ]]</pre>
                     </div>
                     <table class="table code">
                         <thead>

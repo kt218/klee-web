@@ -72,11 +72,11 @@ class FileSerializer(serializers.HyperlinkedModelSerializer):
 
 class GameChallengeSerializer(serializers.HyperlinkedModelSerializer):
     project_id = serializers.PrimaryKeyRelatedField(read_only=True)
-    solution_code = FileSerializer()
+    main_code = FileSerializer()
     default_user_code = serializers.PrimaryKeyRelatedField(
         queryset=File.objects.all(), default=None)
 
     class Meta:
         model = GameChallenge
         fields = ('id', 'name', 'task_md', 'project_id', 'solution_code',
-                  'default_user_code')
+                  'template_code', 'main_code', 'default_user_code')

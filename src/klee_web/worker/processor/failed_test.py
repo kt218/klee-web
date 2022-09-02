@@ -25,6 +25,7 @@ class FailedTestProcessor(BaseProcessor):
         line_no = int(self.parse_line_number(content[2]))
 
         return {
+            'file_no': int(re.sub(r'\D', '', file_name)),
             'reason': self.parse_reason(content[0]).capitalize(),
             'line_no': line_no,
             'line': self.get_line_content(line_no)

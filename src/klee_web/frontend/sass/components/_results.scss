@@ -403,5 +403,9 @@
 			display: flex !important;
 			justify-content: center !important;
 		}
+
+		.code.progress-step.failed {
+			color: $console-error-color;
+		}
 	}
 }

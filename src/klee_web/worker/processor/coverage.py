@@ -1,5 +1,6 @@
 import os
 import glob
+import re
 
 from worker.processor.base import BaseProcessor
 from worker.utils.gcovparse import gcovparse
@@ -30,18 +31,24 @@ class CoverageProcessor(BaseProcessor):
 
         result_dir = os.path.join(self.runner.tempdir, 'klee-out-0')
         ktest_files = glob.glob(os.path.join(result_dir, "*.ktest"))
-
+        ktest_files = sorted(ktest_files,
+                             key=lambda f: int(re.sub(r'\D', '', f)))
+        replay_outs = []
         for abs_ktest_file in ktest_files:
             base_ktest_file = os.path.basename(abs_ktest_file)
             ktest_file = os.path.join(docker_result_path, base_ktest_file)
 
             klee_replay_command = ['klee-replay', coverage_obj_file,
                                    ktest_file]
-            runner.run_with_docker(klee_replay_command,
-                                   {'KTEST_FILE': ktest_file})
+            out = runner.run_with_docker(klee_replay_command,
+                                         {'KTEST_FILE': ktest_file,
+                                          # TODO: allow for variable replay
+                                          #  timeout taken from -max-time arg
+                                          'KLEE_REPLAY_TIMEOUT': 10 * 60})
+            replay_outs.append(out)
 
         llvm_cov_command = ['llvm-cov-11', 'gcov', '-t',
                             runner.DOCKER_CODE_FILE]
         gcov_data = runner.run_with_docker(llvm_cov_command)
 
-        return gcovparse(gcov_data)
+        return {'gcov': gcovparse(gcov_data), 'replays': replay_outs}

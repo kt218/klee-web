@@ -77,9 +77,10 @@ class GameChallenge(models.Model):
 
     name = models.TextField()
     task_md = models.TextField()
-    solution_code = models.OneToOneField(File,
-                                         on_delete=models.CASCADE)
-    # options = models.TextField(null=True)  # TODO: add -max-time=10min
+    template_code = models.TextField()
+    solution_code = models.TextField()
+    main_code = models.OneToOneField(File,
+                                     on_delete=models.CASCADE)
     default_user_code = models.ForeignKey("File",
                                           on_delete=models.CASCADE,
                                           null=True,

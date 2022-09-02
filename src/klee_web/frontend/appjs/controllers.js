@@ -11,11 +11,6 @@ controllers.controller('MainCtrl', [
             code: ''
         };
 
-        $scope.solutionCode = {
-            name: null,
-            code: '// MISSING: solution code',
-        }
-
         $scope.opts = {
             symArgs: false,
             symFiles: false,
@@ -55,11 +50,13 @@ controllers.controller('MainCtrl', [
         $scope.challenges = [];
         $scope.challenge = {
             name: null,
-            md: '# IF YOU SEE THIS SOMETHING WENT WRONG',
-            solutionCode: {
+            md: '# Loading task...',
+            mainCode: {
                 name: null,
-                code: '// MISSING: solution code',
+                code: '// Loading main code...',
             },
+            solutionCode: '// Loading solution code...',
+            templateCode: '// Loading template...',
         };
 
         $scope.toggleSymArgs = function ($event) {
@@ -89,6 +86,7 @@ controllers.controller('MainCtrl', [
         
         $scope.resetLoadedFile = function() {
             $scope.submission = angular.copy($scope.defaultSubmission);
+            console.log('resetLoadedFile', $scope.submission.code);
         }
 
         var saveTimeout = null;
@@ -110,6 +108,12 @@ controllers.controller('MainCtrl', [
                 var nextSave = ((lastSaveTime + MIN_SAVE_INTERVAL) - Date.now());
                 var timeToSave = Math.max(nextSave, 0);
                 saveTimeout = setTimeout(saveSubmission, timeToSave);
+
+                if (newVal.challengeId === oldVal.challengeId) {
+                    $scope.challenge.templateCode = newVal.code;
+                    console.log('Save editor to challenge template');
+                }
+                console.log('$watch submission');
             }
         }, true);
         
@@ -131,11 +135,13 @@ controllers.controller('MainCtrl', [
             const submissionCopy = angular.copy(submission);
 
             if ($scope.selectedProject.game) {
-                submissionCopy.code = $scope.challenge.solutionCode.code +
+                submissionCopy.code = $scope.challenge.mainCode.code +
                     '\n\n' + submission.code;
-                // Ensure klee run will time out at 10min
-                submissionCopy.runConfiguration.coverage_enable = true;
-                submissionCopy.runConfiguration.options += '-max-time=10min';
+                submissionCopy.runConfiguration.coverage_enabled = true;
+                submissionCopy.runConfiguration.options +=
+                    '--external-calls=all ' +
+                    '-max-time=10min';
+                // TODO: move these to fixtures
                 // TODO: add more options for search-heuristics
             }
 
@@ -194,11 +200,18 @@ controllers.controller('MainCtrl', [
         $scope.drawCoverage = function(coverage) {
             $scope.editor.setValue($scope.submission.code);
 
-            var linesHit = 0;
-            var linesTotal = 0;
-            var lines = coverage.lines;
-            for (var i = 0; i < lines.length; i++) {
-                var hit = lines[i].hit;
+            let offset = 0;
+            if ($scope.selectedProject.game) {
+                offset = $scope.challenge.mainCode.code.split("\n").length + 1;
+            }
+
+            let linesHit = 0;
+            let linesTotal = 0;
+            const lines = coverage.lines;
+            const codeLength = $scope.submission.code.split("\n").length;
+            for (let i = 0; i < codeLength; i++) {
+                console.log(lines.length, i, offset, codeLength);
+                var hit = lines[i + offset].hit;
                 if (hit == null) {
                     $scope.editor.addLineClass(i, 'wrap', 'line-null');
                 } else {
@@ -220,7 +233,7 @@ controllers.controller('MainCtrl', [
 
         $scope.$watch('result', function (result) {
             if (!(angular.isUndefined(result.coverage) || result.coverage === null)) {
-                $scope.drawCoverage(result.coverage[0]);
+                $scope.drawCoverage(result.coverage.gcov[0]);
             }
         });
     }
@@ -246,6 +259,9 @@ controllers.controller('EditorCtrl', [
                 active: true
             },
             solution: {
+                active: false
+            },
+            main: {
                 active: false
             },
         };
@@ -300,13 +316,17 @@ controllers.controller('SidebarCtrl', [
                         id: selectedChallengeId
                     });
                 }
-                return ChallengeFile.query({
-                    projectId: projectId,
-                    challengeId: selectedChallenge.id
-                }).$promise;
-            }).then(function(files) {
-                $scope.files = files;
                 $scope.selectChallenge(selectedChallenge);
+            });
+        }
+
+        function refreshChallengeFiles(projectId, selectedChallengeId) {
+            return ChallengeFile.query({
+                projectId: projectId,
+                challengeId: selectedChallengeId,
+            }).$promise.then(function(files) {
+                $scope.files = files;
+                return files;
             });
         }
 
@@ -406,29 +426,34 @@ controllers.controller('SidebarCtrl', [
         $scope.selectChallenge = function(challenge) {
             const selectedProject = $scope.$parent.selectedProject;
             $scope.$parent.challenge = challenge;
-            // TODO: fix so that default will be user's actual code file
-            if (!!$scope.files.length) {
-                challenge.defaultUserCode = $scope.files[0].id;
-            } else {
-                $scope.resetLoadedFile();
-                const submission = $scope.$parent.submission;
-                submission.name = challenge.name;
-                submission.projectId = challenge.projectId;
-                submission.challengeId = challenge.id;
-                challenge.defaultUserCode = submission;
-            }
-            selectedProject.defaultChallenge = challenge.id;
-            const solutionCode = challenge.solutionCode;
-            for (opt in $scope.opts) {
-                if (
-                    solutionCode.runConfiguration &&
-                    solutionCode.runConfiguration[opt] &&
-                    solutionCode.runConfiguration[opt].size
-                ) {
-                    $scope.opts[opt] = true;
-                }
-            }
-            $scope.$parent.config = solutionCode.runConfiguration;
+            refreshChallengeFiles(selectedProject.id, challenge.id)
+                .then(function() {
+                    if (!!$scope.files.length) {
+                        // TODO: fix so that default will be user's actual code file
+                        const file = $scope.files[0];
+                        $scope.$parent.submission = file;
+                        challenge.defaultUserCode = file;
+                    } else {
+                        const submission = $scope.$parent.submission;
+                        submission.name = challenge.name;
+                        submission.code = challenge.templateCode;
+                        submission.projectId = challenge.projectId;
+                        submission.challengeId = challenge.id;
+                        challenge.defaultUserCode = submission;
+                    }
+                    selectedProject.defaultChallenge = challenge.id;
+                    const solutionCode = challenge.mainCode;
+                    for (opt in $scope.opts) {
+                        if (
+                            solutionCode.runConfiguration &&
+                            solutionCode.runConfiguration[opt] &&
+                            solutionCode.runConfiguration[opt].size
+                        ) {
+                            $scope.opts[opt] = true;
+                        }
+                    }
+                    $scope.$parent.config = solutionCode.runConfiguration;
+                });
         };
 
         $scope.resetProjectSelector = function() {
@@ -520,8 +545,16 @@ controllers.controller('ResultTabsCtrl', [
             },
             testcases: {
                 active: false
-            }
+            },
+            replays: {
+                active: false
+            },
         };
+
+        $scope.passedNo = 0;
+        $scope.failedNo = 0;
+
+        $scope.replays = [];
 
         $scope.hideAllTabs = function() {
             angular.forEach($scope.tabs, function(tab, name) {
@@ -543,6 +576,44 @@ controllers.controller('ResultTabsCtrl', [
             }
         });
 
+        $scope.$watch('result', function (result) {
+            passFailNos(result);
+            replays(result);
+        });
+
+        function passFailNos(result) {
+            if (!result.failed_tests) return;
+            console.log(
+                'updateNo: ',
+                typeof result.failed_tests,
+                result.failed_tests.length
+            );
+            $scope.failedNo = result.failed_tests.length;
+            $scope.passedNo = result.test_cases.length - $scope.failedNo;
+        }
+
+        function replays(result) {
+            if (!result.coverage || !$scope.$parent.selectedProject.game) return;
+            // Array of file no.s of failed tests
+            const fails = result.failed_tests.map(f => f.file_no);
+
+            $scope.replays = [];
+            for (const r of result.coverage.replays) {
+              let [file, inp, sol_out, your_out] = r.split('>>>>');
+              file = file.match(/(?!test)\d+(?=.ktest)/g)[0];
+              console.log('replay', Number(file), your_out);
+              your_out = your_out.split('====')[0];
+              $scope.replays.push({
+                  fileNo: Number(file),
+                  failed: fails.includes(Number(file)),
+                  inp,
+                  sol_out,
+                  your_out,
+              });
+              console.log('after', your_out);
+            }
+            console.log('replays', $scope.replays.map(r => r.failed));
+        }
     }
 ]);
 
@@ -555,6 +626,17 @@ controllers.controller('TestcasesPaginationCtrl', [
 
         $scope.$watch('currentPage', function() {
         });
+
+        $scope.isFailedTest = function(testNo) {
+            console.log("isFailedTest used", testNo, $scope.$parent.$parent.result.failed_tests);
+            if (_.findWhere(
+                $scope.$parent.$parent.result.failed_tests, {file_no: testNo}
+            )) {
+                return "failed";
+            } else {
+                return "";
+            }
+        }
     }
 ]);
 
@@ -564,7 +646,18 @@ controllers.controller('TaskMarkedCtrl', [
         $scope.md = $scope.$parent.challenge.taskMd;
         $scope.mdHtml = '';
 
-        $scope.editorOptions = {
+        $scope.testfileEditorOptions = {
+            viewportMargin: 5,
+            lineWrapping: true,
+            lineNumbers: true,
+            mode: {
+                name: 'text/x-csrc',
+                useCPP: true
+            },
+            theme: 'neo',
+        };
+
+        $scope.solutionEditorOptions = {
             viewportMargin: 5,
             lineWrapping: true,
             lineNumbers: true,
@@ -574,12 +667,12 @@ controllers.controller('TaskMarkedCtrl', [
             },
             readOnly: 'nocursor',
             theme: 'neo',
-        };
+        }
 
         $scope.$watch('$parent.challenge', function(challenge) {
             let md = challenge.taskMd;
             if (!md)
-                md = '# This is blank...';
+                md = 'Loading game task...';
             $scope.mdHtml = marked(md);
         });
     }
